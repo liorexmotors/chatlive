@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>אתר עם AI Nav</title>
+    <style>
+        /* עיצוב ראשי */
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: white;
+            font-family: Arial, sans-serif;
+        }
+        h1, p {
+            color: #FC6523;  /* תיקנתי את הצבע - הוספתי # */
+            text-align: center;
+            margin: 0.5em;
+        }
+        /* עיצוב שולחני */
+        h1 {
+            font-size: 3em;
+        }
+        p {
+            font-size: 1.5em;
+        }
+        /* התאמות רספונסיביות למסכים קטנים יותר */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2em;
+            }
+            p {
+                font-size: 1.2em;
+            }
+        }
+        @media (max-width: 480px) {
+            h1 {
+                font-size: 1.8em;
+            }
+            p {
+                font-size: 1em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div>
+        <h1>סוכן חכם -סוהו</h1>
+        <p>לחץ על החלונית למטה</p>
+        <co-pilot 
+            platform-id="0c026aa7-1291-46cb-8af4-2203d3840fd0" 
+            user-id="188b06ee-8d2d-4960-9ff5-e7385f6de640" 
+            chatbot-id="22995001-afe8-4a38-8395-00444a6c17cd" 
+            is-local="false">
+            <a href="https://www.chatsimple.ai/?utm_source=widget&utm_medium=referral">AI Nav</a>
+        </co-pilot>
+        <script src="https://cdn.chatsimple.ai/ai-loader.js" defer></script>
+    </div>
+</body>
+</html>
