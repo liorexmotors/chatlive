@@ -12,14 +12,31 @@
             align-items: center;
             height: 100vh;
             margin: 0;
-            background-color: white;
             font-family: Arial, sans-serif;
+            /* הוספת תמונת רקע */
+            background-image: url('https://dormotor.co.il/wp-content/uploads/2023/01/%D7%90%D7%95%D7%93%D7%95%D7%AA%D7%99%D7%A0%D7%95.jpg');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
         }
+        
+        /* הוספת מיכל עם רקע שקוף */
+        .container {
+            background-color: rgba(255, 255, 255, 0.8); /* רקע לבן שקוף */
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
         h1, p {
-            color: #bed62f;  /* תיקנתי את הצבע - הוספתי # */
+            color: #bed62f;
             text-align: center;
             margin: 0.5em;
+            /* הוספת צל לטקסט במקרה שתמונת הרקע כהה */
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
         }
+
         /* עיצוב שולחני */
         h1 {
             font-size: 3em;
@@ -27,6 +44,7 @@
         p {
             font-size: 1.5em;
         }
+
         /* התאמות רספונסיביות למסכים קטנים יותר */
         @media (max-width: 768px) {
             h1 {
@@ -35,7 +53,11 @@
             p {
                 font-size: 1.2em;
             }
+            .container {
+                margin: 10px;
+            }
         }
+
         @media (max-width: 480px) {
             h1 {
                 font-size: 1.8em;
@@ -43,13 +65,25 @@
             p {
                 font-size: 1em;
             }
+            .container {
+                margin: 5px;
+                padding: 10px;
+            }
         }
     </style>
 </head>
 <body>
-    <div>
+    <div class="container">
         <h1>סוכן חכם-דור צ'רכי</h1>
-        <p>לחץ על החלונית למטה</p><co-pilot platform-id="0c026aa7-1291-46cb-8af4-2203d3840fd0" user-id="188b06ee-8d2d-4960-9ff5-e7385f6de640" chatbot-id="22995001-afe8-4a38-8395-00444a6c17cd" is-local="false" ><a href="https://www.chatsimple.ai/?utm_source=widget&utm_medium=referral">AI Nav</a></co-pilot> <script src="https://cdn.chatsimple.ai/ai-loader.js" defer></script>
+        <p>לחץ על החלונית למטה</p>
+        <co-pilot 
+            platform-id="0c026aa7-1291-46cb-8af4-2203d3840fd0" 
+            user-id="188b06ee-8d2d-4960-9ff5-e7385f6de640" 
+            chatbot-id="22995001-afe8-4a38-8395-00444a6c17cd" 
+            is-local="false">
+            <a href="https://www.chatsimple.ai/?utm_source=widget&utm_medium=referral">AI Nav</a>
+        </co-pilot> 
+        <script src="https://cdn.chatsimple.ai/ai-loader.js" defer></script>
     </div>
 </body>
 </html>
