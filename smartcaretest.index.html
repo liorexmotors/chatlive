@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>בדיקת קר-חכם</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+            width: 100%;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: white;
+            padding: 20px;
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        h1 {
+            color: fuchsia;
+            font-size: clamp(2rem, 5vw, 3rem);
+            margin-bottom: 1rem;
+        }
+
+        p {
+            color: fuchsia;
+            font-size: clamp(1rem, 3vw, 1.5rem);
+            margin-bottom: 1.5rem;
+        }
+
+        /* התאמות למסכים בינוניים */
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+        }
+
+        /* התאמות למסכים קטנים */
+        @media (max-width: 480px) {
+            body {
+                padding: 10px;
+            }
+            
+            .container {
+                padding: 10px;
+            }
+        }
+
+        /* התאמות למסכים גדולים מאוד */
+        @media (min-width: 1200px) {
+            .container {
+                padding: 30px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>בדיקת קר-חכם</h1>
+        <p>לחץ על החלונית למטה מימין</p>
+        <div id="fastbots-container"></div>
+    </div>
+    <script defer src="https://app.fastbots.ai/embed.js" data-bot-id="cm489g1t71im9n8bmb89pgnz4"></script>
+</body>
+</html>
