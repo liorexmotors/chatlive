@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מרכז מכירת אופנועים</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            direction: rtl;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .hidden {
+            display: none !important;
+        }
+        .motorcycle-list {
+            display: grid;
+            gap: 10px;
+        }
+        .motorcycle-card, .user-card {
+            background: #f9f9f9;
+            padding: 15px;
+            border: 1px solid #ddd;
+            margin-bottom: 10px;
+        }
+        #adminSection {
+            margin-top: 20px;
+        }
+        #adminLogin, #adminDashboard {
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="authSection" class="container">
+        <div id="loginForm">
+            <h2>התחברות למערכת מכירת אופנועים</h2>
+            <input type="email" id="loginEmail" placeholder="אימייל" required>
+            <input type="password" id="loginPassword" placeholder="סיסמה" required>
+            <button onclick="login()">התחבר</button>
+            <button onclick="showRegisterForm()">הרשמה</button>
+            <button onclick="showAdminLoginForm()">כניסת מנהל</button>
+        </div>
+
+        <div id="registerForm" class="hidden">
+            <h2>הרשמת מוכר אופנועים</h2>
+            <input type="text" id="sellerName" placeholder="שם מלא" required>
+            <input type="email" id="registerEmail" placeholder="אימייל" required>
+            <input type="tel" id="sellerPhone" placeholder="מספר טלפון" required>
+            <input type="password" id="registerPassword" placeholder="סיסמה" required>
+            <input type="password" id="confirmPassword" placeholder="אימות סיסמה" required>
+            <button onclick="register()">הירשם</button>
+        </div>
+
+        <div id="adminLoginForm" class="hidden">
+            <h2>כניסת מנהל</h2>
+            <input type="email" id="adminEmail" placeholder="אימייל מנהל" required>
+            <input type="password" id="adminPassword" placeholder="סיסמה" required>
+            <button onclick="performAdminLogin()">התחבר</button>
+        </div>
+    </div>
+
+    <div id="mainContent" class="hidden container">
+        <h2 id="welcomeMessage"></h2>
+        <button onclick="logout()">התנתק</button>
+
+        <div>
+            <h3>הוספת אופנוע למכירה</h3>
+            <form id="motorcycleForm">
+                <input type="text" id="manufacturer" placeholder="יצרן" required>
+                <input type="text" id="model" placeholder="דגם" required>
+                <input type="number" id="year" placeholder="שנת ייצור" min="1990" max="2024" required>
+                <input type="text" id="color" placeholder="צבע" required>
+                <input type="text" id="color" placeholder="מחיר מבוקש" required>
+                <input type="text" id="color" placeholder="מחיר מחירון" required>
+				
+                <select id="handNumber" required>			
+                    <option value="">מספר יד</option>
+                    <option value="1">יד ראשונה</option>
+                    <option value="2">יד שנייה</option>
+                    <option value="3">יד שלישית</option>
+                    <option value="4">יד רביעית+</option>
+                </select>
+                <input type="number" id="kilometers" placeholder="מספר קילומטרים" required>
+                <textarea id="description" placeholder="תיאור כללי" rows="3" required></textarea>
+                <input type="tel" id="contactPhone" placeholder="מספר טלפון ליצירת קשר" required>
+                <button type="submit">הוסף אופנוע למכירה</button>
+            </form>
+        </div>
+
+        <div>
+            <h3>האופנועים שלי</h3>
+            <div id="motorcycleList" class="motorcycle-list"></div>
+        </div>
+    </div>
+
+    <div id="adminDashboard" class="hidden container">
+        <h2>ממשק ניהול מערכת</h2>
+        <button onclick="adminLogout()">התנתק</button>
+        
+        <div id="userManagement">
+            <h3>ניהול משתמשים</h3>
+            <div id="userList"></div>
+        </div>
+    </div>
+
+    <script>
+        // Local Storage Management
+        class StorageManager {
+            static getUsers() {
+                return JSON.parse(localStorage.getItem('motorcycleSellers') || '{}');
+            }
+
+            static saveUsers(users) {
+                localStorage.setItem('motorcycleSellers', JSON.stringify(users));
+            }
+
+            static getCurrentUser() {
+                return localStorage.getItem('currentMotorcycleSeller');
+            }
+
+            static setCurrentUser(email) {
+                localStorage.setItem('currentMotorcycleSeller', email);
+            }
+
+            static clearCurrentUser() {
+                localStorage.removeItem('currentMotorcycleSeller');
+            }
+        }
+
+        // Admin Management Extension
+        class AdminManager {
+            static getAdmins() {
+                return JSON.parse(localStorage.getItem('motorcycleSiteAdmins') || '{}');
+            }
+
+            static saveAdmins(admins) {
+                localStorage.setItem('motorcycleSiteAdmins', JSON.stringify(admins));
+            }
+
+            static initializeAdmin() {
+                const admins = this.getAdmins();
+                if (Object.keys(admins).length === 0) {
+                    admins['admin@motorcycles.com'] = {
+                        password: 'admin123',
+                        name: 'מנהל ראשי'
+                    };
+                    this.saveAdmins(admins);
+                }
+            }
+
+            static adminLogin(email, password) {
+                const admins = this.getAdmins();
+                const admin = admins[email];
+                return admin && admin.password === password;
+            }
+        }
+
+        // Authentication Functions
+        function showAdminLoginForm() {
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('adminLoginForm').classList.remove('hidden');
+        }
+
+        function showRegisterForm() {
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('registerForm').classList.remove('hidden');
+        }
+
+        function register() {
+            const name = document.getElementById('sellerName').value.trim();
+            const email = document.getElementById('registerEmail').value.trim();
+            const phone = document.getElementById('sellerPhone').value.trim();
+            const password = document.getElementById('registerPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+
+            if (!name || !email || !phone || !password || !confirmPassword) {
+                alert('אנא מלא את כל השדות');
+                return;
+            }
+
+            if (password !== confirmPassword) {
+                alert('הסיסמאות אינן תואמות');
+                return;
+            }
+
+            const users = StorageManager.getUsers();
+            if (users[email]) {
+                alert('המשתמש כבר קיים');
+                return;
+            }
+
+            users[email] = {
+                name,
+                phone,
+                password,
+                motorcycles: [],
+                isAllowedToPost: true,
+                registrationDate: new Date().toISOString()
+            };
+
+            StorageManager.saveUsers(users);
+            alert('נרשמת בהצלחה! אנא התחבר');
+            location.reload();
+        }
+
+        function login() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+
+            const users = StorageManager.getUsers();
+            const user = users[email];
+
+            if (user && user.password === password) {
+                if (!user.isAllowedToPost) {
+                    alert('משתמש זה חסום מפרסום');
+                    return;
+                }
+
+                StorageManager.setCurrentUser(email);
+                showMainContent(user);
+            } else {
+                alert('פרטי התחברות שגויים');
+            }
+        }
+
+        function performAdminLogin() {
+            const email = document.getElementById('adminEmail').value;
+            const password = document.getElementById('adminPassword').value;
+            
+            if (AdminManager.adminLogin(email, password)) {
+                document.getElementById('authSection').classList.add('hidden');
+                document.getElementById('adminDashboard').classList.remove('hidden');
+                renderUserList();
+            } else {
+                alert('פרטי התחברות שגויים');
+            }
+        }
+
+        function logout() {
+            StorageManager.clearCurrentUser();
+            location.reload();
+        }
+
+        function adminLogout() {
+            location.reload();
+        }
+
+        function showMainContent(user) {
+            document.getElementById('authSection').classList.add('hidden');
+            document.getElementById('mainContent').classList.remove('hidden');
+            document.getElementById('welcomeMessage').textContent = `שלום, ${user.name}`;
+            displayMotorcycles();
+        }
+
+        function renderUserList() {
+            const userList = document.getElementById('userList');
+            userList.innerHTML = '';
+            const users = StorageManager.getUsers();
+            
+            Object.entries(users).forEach(([email, user]) => {
+                const userCard = document.createElement('div');
+                userCard.className = 'user-card';
+                userCard.innerHTML = `
+                    <h4>${user.name}</h4>
+                    <p>אימייל: ${email}</p>
+                    <p>טלפון: ${user.phone}</p>
+                    <p>אופנועים: ${user.motorcycles.length}</p>
+                    <p>סטטוס: ${user.isAllowedToPost ? 'מאופשר' : 'חסום'}</p>
+                    <button onclick="toggleUserStatus('${email}')">
+                        ${user.isAllowedToPost ? 'חסום' : 'שחרר'}
+                    </button>
+                    <button onclick="deleteUser('${email}')">מחק משתמש</button>
+                `;
+                userList.appendChild(userCard);
+            });
+        }
+
+        function toggleUserStatus(email) {
+            const users = StorageManager.getUsers();
+            users[email].isAllowedToPost = !users[email].isAllowedToPost;
+            StorageManager.saveUsers(users);
+            renderUserList();
+        }
+
+        function deleteUser(email) {
+            if (confirm(`האם אתה בטוח שברצונך למחוק את המשתמש ${email}?`)) {
+                const users = StorageManager.getUsers();
+                delete users[email];
+                StorageManager.saveUsers(users);
+                renderUserList();
+            }
+        }
+
+        // Motorcycle Management
+        document.getElementById('motorcycleForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const email = StorageManager.getCurrentUser();
+            const users = StorageManager.getUsers();
+            const user = users[email];
+
+            const motorcycle = {
+                manufacturer: document.getElementById('manufacturer').value,
+                model: document.getElementById('model').value,
+                year: document.getElementById('year').value,
+                color: document.getElementById('color').value,
+                handNumber: document.getElementById('handNumber').value,
+                kilometers: document.getElementById('kilometers').value,
+                description: document.getElementById('description').value,
+                contactPhone: document.getElementById('contactPhone').value,
+                uploadDate: new Date().toISOString()
+            };
+
+            if (user.motorcycles.length >= 5) {
+                alert('ניתן להעלות עד 5 אופנועים');
+                return;
+            }
+
+            user.motorcycles.push(motorcycle);
+            StorageManager.saveUsers(users);
+            displayMotorcycles();
+            this.reset();
+        });
+
+        function displayMotorcycles() {
+            const email = StorageManager.getCurrentUser();
+            const users = StorageManager.getUsers();
+            const user = users[email];
+            const motorcycleList = document.getElementById('motorcycleList');
+            motorcycleList.innerHTML = '';
+
+            const currentDate = new Date();
+            user.motorcycles = user.motorcycles.filter(moto => {
+                const uploadDate = new Date(moto.uploadDate);
+                const daysDiff = (currentDate - uploadDate) / (1000 * 3600 * 24);
+                return daysDiff <= 45;
+            });
+
+            StorageManager.saveUsers(users);
+
+            user.motorcycles.forEach((moto, index) => {
+                const card = document.createElement('div');
+                card.className = 'motorcycle-card';
+                card.innerHTML = `
+                    <h3>${moto.manufacturer} ${moto.model}</h3>
+                    <p>שנה: ${moto.year}</p>
+                    <p>צבע: ${moto.color}</p>
+                    <p>ק"מ: ${moto.kilometers}</p>
+                    <p>טלפון: ${moto.contactPhone}</p>
+                    <p>${moto.description}</p>
+                    <button onclick="deleteMoto(${index})">מחק אופנוע</button>
+                `;
+                motorcycleList.appendChild(card);
+            });
+        }
+
+        function deleteMoto(index) {
+            const email = StorageManager.getCurrentUser();
+            const users = StorageManager.getUsers();
+            const user = users[email];
+
+            user.motorcycles.splice(index, 1);
+            StorageManager.saveUsers(users);
+            displayMotorcycles();
+        }
+
+        // Initial Setup
+        window.onload = function() {
+            AdminManager.initializeAdmin();
+            const currentUser = StorageManager.getCurrentUser();
+            if (currentUser) {
+                const users = StorageManager.getUsers();
+                showMainContent(users[currentUser]);
+            }
+        };
+    </script>
+</body>
+</html>
