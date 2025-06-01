@@ -1,0 +1,637 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
+import { getFirestore, collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
+
+// Motorcycle SVG Icon (for futuristic touch)
+const MotorcycleIcon = () => (
+    <svg className="w-10 h-10 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 14v6m-3-3h6m-9-11h0l-3.5 3.5a1.5 1.5 0 01-2.121 0L3 10.121a1.5 1.5 0 010-2.121l3.5-3.5h0m0 0L9 3m-3 3l3.5 3.5m-3.5-3.5L3 10.121M17 14l-3-3m3 3l3.5 3.5m-3.5-3.5L21 17.5l-3.5 3.5m-3.5-3.5L14 17.5l-3.5-3.5"></path>
+    </svg>
+);
+
+// Custom Confirmation Modal Component
+const CustomModal = ({ message, onConfirm, onCancel }) => {
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4 animate-fade-in">
+            <div className="bg-gray-800 rounded-xl shadow-2xl p-8 w-full max-w-md text-center border border-purple-600 transform scale-95 animate-scale-in">
+                <p className="text-xl font-semibold text-gray-100 mb-8">
+                    {message}
+                </p>
+                <div className="flex justify-center space-x-6">
+                    <button
+                        onClick={onConfirm}
+                        className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ring-offset-gray-800"
+                    >
+                        כן
+                    </button>
+                    <button
+                        onClick={onCancel}
+                        className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 ring-offset-gray-800"
+                    >
+                        לא
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// Motorcycle Form Component
+const MotorcycleForm = ({ db, userId, currentMotorcycle, onSave, onCancelEdit }) => {
+    const [formData, setFormData] = useState({
+        purchaseDate: '', myCost: '', listPrice: '', investment: '',
+        ownerNumber: '', nextTestDate: '', manufacturer: '', model: '',
+        color: '', licensePlate: '', minSellingPrice: '',
+        licenseType: '',
+        shortDescription: '',
+        mileage: '', // New field: mileage
+    });
+
+    // Populate form if editing an existing motorcycle
+    useEffect(() => {
+        if (currentMotorcycle) {
+            setFormData({
+                purchaseDate: currentMotorcycle.purchaseDate || '',
+                myCost: currentMotorcycle.myCost || '',
+                listPrice: currentMotorcycle.listPrice || '',
+                investment: currentMotorcycle.investment || '',
+                ownerNumber: currentMotorcycle.ownerNumber || '',
+                nextTestDate: currentMotorcycle.nextTestDate || '',
+                manufacturer: currentMotorcycle.manufacturer || '',
+                model: currentMotorcycle.model || '',
+                color: currentMotorcycle.color || '',
+                licensePlate: currentMotorcycle.licensePlate || '',
+                minSellingPrice: currentMotorcycle.minSellingPrice || '',
+                licenseType: currentMotorcycle.licenseType || '',
+                shortDescription: currentMotorcycle.shortDescription || '',
+                mileage: currentMotorcycle.mileage || '', // Populate new field
+            });
+        } else {
+            // Clear form when not editing
+            setFormData({
+                purchaseDate: '', myCost: '', listPrice: '', investment: '',
+                ownerNumber: '', nextTestDate: '', manufacturer: '', model: '',
+                color: '', licensePlate: '', minSellingPrice: '',
+                licenseType: '',
+                shortDescription: '',
+                mileage: '', // Clear new field
+            });
+        }
+    }, [currentMotorcycle]);
+
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prevData => ({
+            ...prevData,
+            [name]: value
+        }));
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!db || !userId) {
+            console.error("Firestore or User ID not available.");
+            return;
+        }
+
+        const motorcyclesCollectionRef = collection(db, `artifacts/${__app_id}/public/data/motorcycles`);
+
+        try {
+            if (currentMotorcycle && currentMotorcycle.id) {
+                // Update existing motorcycle
+                const motorcycleDocRef = doc(db, `artifacts/${__app_id}/public/data/motorcycles`, currentMotorcycle.id);
+                await updateDoc(motorcycleDocRef, {
+                    ...formData,
+                    updatedAt: new Date().toISOString(),
+                    updatedBy: userId,
+                });
+                console.log("Motorcycle updated successfully!");
+            } else {
+                // Add new motorcycle
+                await addDoc(motorcyclesCollectionRef, {
+                    ...formData,
+                    createdAt: new Date().toISOString(),
+                    createdBy: userId,
+                });
+                console.log("Motorcycle added successfully!");
+            }
+            onSave(); // Notify parent component that save is complete
+        } catch (error) {
+            console.error("Error adding/updating motorcycle:", error);
+        }
+    };
+
+    return (
+        <section className="bg-gray-800 rounded-xl shadow-2xl p-6 sm:p-8 mb-10 max-w-4xl mx-auto border border-purple-700 animate-fade-in-up">
+            <h2 className="text-2xl sm:text-3xl font-bold text-cyan-400 mb-6 text-center">
+                {currentMotorcycle ? 'ערוך פרטי אופנוע' : 'הוסף אופנוע חדש'}
+            </h2>
+            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {[
+                    { label: 'תאריך רכישה', type: 'date', name: 'purchaseDate' },
+                    { label: 'עלות שלי (₪)', type: 'number', name: 'myCost' }, // This field will be conditionally visible
+                    { label: 'מחיר מחירון (₪)', type: 'number', name: 'listPrice' },
+                    { label: 'השקעה נוספת (₪)', type: 'number', name: 'investment' },
+                    { label: 'יד', type: 'number', name: 'ownerNumber' },
+                    { label: 'תאריך טסט קרוב', type: 'date', name: 'nextTestDate' },
+                    { label: 'יצרן', type: 'text', name: 'manufacturer' },
+                    { label: 'דגם', type: 'text', name: 'model' },
+                    { label: 'צבע', type: 'text', name: 'color' },
+                    { label: 'מספר רישוי', type: 'text', name: 'licensePlate' },
+                    { label: 'מחיר מינימום למכירה (₪)', type: 'number', name: 'minSellingPrice' },
+                    { label: 'סוג רישיון', type: 'text', name: 'licenseType' },
+                    { label: 'מס ק"מ', type: 'number', name: 'mileage' }, // New field: mileage
+                    { label: 'תיאור קצר', type: 'textarea', name: 'shortDescription' },
+                ].map((field) => (
+                    <div key={field.name} className="flex flex-col">
+                        <label htmlFor={field.name} className="block text-sm font-medium text-gray-300 mb-1">
+                            {field.label}
+                        </label>
+                        {field.type === 'textarea' ? (
+                            <textarea
+                                id={field.name}
+                                name={field.name}
+                                value={formData[field.name]}
+                                onChange={handleChange}
+                                className="mt-1 block w-full px-4 py-2 border border-gray-600 rounded-lg shadow-sm focus:ring-cyan-500 focus:border-cyan-500 bg-gray-700 text-gray-100 transition duration-200 h-24 resize-y"
+                                required={field.type === 'text' || field.type === 'number' ? true : false}
+                            ></textarea>
+                        ) : (
+                            <input
+                                type={field.type}
+                                id={field.name}
+                                name={field.name}
+                                value={formData[field.name]}
+                                onChange={handleChange}
+                                className="mt-1 block w-full px-4 py-2 border border-gray-600 rounded-lg shadow-sm focus:ring-cyan-500 focus:border-cyan-500 bg-gray-700 text-gray-100 transition duration-200"
+                                required={field.type === 'text' || field.type === 'number' ? true : false}
+                            />
+                        )}
+                    </div>
+                ))}
+                <div className="md:col-span-2 flex justify-center mt-4 space-x-4">
+                    <button
+                        type="submit"
+                        className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ring-offset-gray-800"
+                    >
+                        {currentMotorcycle ? 'עדכן אופנוע' : 'הוסף אופנוע'}
+                    </button>
+                    {currentMotorcycle && (
+                        <button
+                            type="button"
+                            onClick={onCancelEdit}
+                            className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 ring-offset-gray-800"
+                        >
+                            בטל עריכה
+                        </button>
+                    )}
+                </div>
+            </form>
+        </section>
+    );
+};
+
+// Motorcycle List Component
+const MotorcycleList = ({ motorcycles, userId, onEdit, onDelete, onAddMotorcycle, isMainUser }) => {
+    const [showModal, setShowModal] = useState(false);
+    const [modalMessage, setModalMessage] = useState('');
+    const [modalAction, setModalAction] = useState(() => () => {});
+    const [upcomingTests, setUpcomingTests] = useState([]); // New state for upcoming tests
+
+    // Effect to check for upcoming tests
+    useEffect(() => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Normalize to start of day
+
+        const sevenDaysFromNow = new Date();
+        sevenDaysFromNow.setDate(today.getDate() + 7);
+        sevenDaysFromNow.setHours(23, 59, 59, 999); // Normalize to end of day
+
+        const upcoming = motorcycles.filter(moto => {
+            if (!moto.nextTestDate) return false;
+
+            const testDate = new Date(moto.nextTestDate);
+            testDate.setHours(0, 0, 0, 0); // Normalize to start of day for comparison
+
+            // Check if testDate is today or in the future, and within the next 7 days
+            return testDate >= today && testDate <= sevenDaysFromNow;
+        });
+        setUpcomingTests(upcoming);
+    }, [motorcycles]); // Re-run when motorcycles data changes
+
+    const showCustomModal = (message, action) => {
+        setModalMessage(message);
+        setModalAction(() => action);
+        setShowModal(true);
+    };
+
+    const confirmModalAction = () => {
+        modalAction();
+        setShowModal(false);
+    };
+
+    return (
+        <section className="bg-gray-800 rounded-xl shadow-2xl p-6 sm:p-8 max-w-6xl mx-auto border border-purple-700 animate-fade-in-up">
+            <h2 className="text-2xl sm:text-3xl font-bold text-cyan-400 mb-6 text-center">
+                האופנועים שלי
+            </h2>
+            {isMainUser && ( // Only show add button if main user
+                <div className="flex justify-center mb-6">
+                    <button
+                        onClick={onAddMotorcycle}
+                        className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 ring-offset-gray-800"
+                    >
+                        הוסף אופנוע חדש
+                    </button>
+                </div>
+            )}
+
+            {/* Upcoming Tests Notification */}
+            {upcomingTests.length > 0 && (
+                <div className="bg-yellow-700 bg-opacity-30 border border-yellow-500 text-yellow-200 p-4 rounded-lg mb-6 animate-fade-in-up">
+                    <h3 className="text-xl font-bold mb-2">
+                        <span role="img" aria-label="warning" className="ml-2">⚠️</span>
+                        התראה: טסטים קרובים!
+                    </h3>
+                    <ul className="list-disc list-inside space-y-1">
+                        {upcomingTests.map(moto => (
+                            <li key={moto.id}>
+                                <span className="font-semibold">{moto.manufacturer} {moto.model} ({moto.licensePlate})</span> - טסט בתאריך: <span className="font-semibold">{moto.nextTestDate}</span>
+                            </li>
+                        ))}
+                    </ul>
+                    <p className="text-sm mt-2">
+                        אנא ודא שהטסטים מתחדשים בזמן.
+                    </p>
+                </div>
+            )}
+
+            {motorcycles.length === 0 ? (
+                <p className="text-center text-gray-400 text-lg">
+                    אין אופנועים להצגה. הוסף אחד כדי להתחיל!
+                </p>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {motorcycles.map((motorcycle) => (
+                        <div key={motorcycle.id} className="bg-gray-700 p-6 rounded-lg shadow-md border border-gray-600 flex flex-col justify-between animate-fade-in-card">
+                            <div>
+                                <h3 className="text-xl font-semibold text-cyan-300 mb-2">
+                                    {motorcycle.manufacturer} {motorcycle.model} ({motorcycle.licensePlate})
+                                </h3>
+                                <p className="text-sm text-gray-400 mb-4">
+                                    נוצר על ידי: {motorcycle.createdBy === userId ? 'אתה' : motorcycle.createdBy}
+                                    {motorcycle.updatedBy && motorcycle.updatedBy !== motorcycle.createdBy && (
+                                        <span>, עודכן על ידי: {motorcycle.updatedBy === userId ? 'אתה' : motorcycle.updatedBy}</span>
+                                    )}
+                                </p>
+                                <ul className="text-gray-200 space-y-2 text-sm">
+                                    <li><span className="font-medium text-gray-300">תאריך רכישה:</span> {motorcycle.purchaseDate}</li>
+                                    {isMainUser && ( // Only show "עלות שלי" if main user
+                                        <li><span className="font-medium text-gray-300">עלות שלי:</span> {motorcycle.myCost} ₪</li>
+                                    )}
+                                    <li><span className="font-medium text-gray-300">מחיר מחירון:</span> {motorcycle.listPrice} ₪</li>
+                                    <li><span className="font-medium text-gray-300">השקעה נוספת:</span> {motorcycle.investment} ₪</li>
+                                    <li><span className="font-medium text-gray-300">יד:</span> {motorcycle.ownerNumber}</li>
+                                    <li><span className="font-medium text-gray-300">טסט קרוב:</span> {motorcycle.nextTestDate}</li>
+                                    <li><span className="font-medium text-gray-300">צבע:</span> {motorcycle.color}</li>
+                                    <li><span className="font-medium text-gray-300">מספר רישוי:</span> {motorcycle.licensePlate}</li>
+                                    <li><span className="font-medium text-gray-300">מחיר מינימום למכירה:</span> {motorcycle.minSellingPrice} ₪</li>
+                                    <li><span className="font-medium text-gray-300">סוג רישיון:</span> {motorcycle.licenseType}</li>
+                                    <li><span className="font-medium text-gray-300">מס ק"מ:</span> {motorcycle.mileage}</li> {/* Display new field: mileage */}
+                                    <li><span className="font-medium text-gray-300">תיאור קצר:</span> {motorcycle.shortDescription}</li>
+                                </ul>
+                            </div>
+                            {isMainUser && ( // Only show edit/delete buttons if main user
+                                <div className="mt-6 flex justify-end space-x-3">
+                                    <button
+                                        onClick={() => onEdit(motorcycle)}
+                                        className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-full shadow-md transform transition duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ring-offset-gray-700"
+                                    >
+                                        ערוך
+                                    </button>
+                                    <button
+                                        onClick={() => showCustomModal("האם אתה בטוח שברצונך למחוק אופנוע זה?", () => onDelete(motorcycle.id))}
+                                        className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-full shadow-md transform transition duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 ring-offset-gray-700"
+                                    >
+                                        מחק
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
+            {showModal && (
+                <CustomModal
+                    message={modalMessage}
+                    onConfirm={confirmModalAction}
+                    onCancel={() => setShowModal(false)}
+                />
+            )}
+        </section>
+    );
+};
+
+// Main App Component
+function App() {
+    // State variables for Firebase instances and user info
+    const [db, setDb] = useState(null);
+    const [auth, setAuth] = useState(null);
+    const [userId, setUserId] = useState(null);
+    const [isAuthReady, setIsAuthReady] = useState(false);
+    const [isMainUser, setIsMainUser] = useState(false); // New state for main user status
+
+    // State for login form
+    const [username, setUsername] = useState('');
+    const [password, setPassword] = useState('');
+    const [loginError, setLoginError] = useState('');
+
+    // State for storing motorcycle data
+    const [motorcycles, setMotorcycles] = useState([]);
+    // State for managing current view: 'list' or 'form'
+    const [currentPage, setCurrentPage] = useState('list'); // Default to list view
+    // State for tracking which motorcycle is being edited
+    const [editingMotorcycle, setEditingMotorcycle] = useState(null);
+
+    // Initialize Firebase and handle authentication
+    useEffect(() => {
+        try {
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+
+            const app = initializeApp(firebaseConfig);
+            const firestoreDb = getFirestore(app);
+            const firebaseAuth = getAuth(app);
+
+            setDb(firestoreDb);
+            setAuth(firebaseAuth);
+
+            const unsubscribe = onAuthStateChanged(firebaseAuth, async (user) => {
+                if (user) {
+                    setUserId(user.uid);
+                } else {
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        try {
+                            await signInWithCustomToken(firebaseAuth, __initial_auth_token);
+                            setUserId(firebaseAuth.currentUser?.uid);
+                        } catch (error) {
+                            console.error("Error signing in with custom token:", error);
+                            await signInAnonymously(firebaseAuth);
+                            setUserId(firebaseAuth.currentUser?.uid);
+                        }
+                    } else {
+                        await signInAnonymously(firebaseAuth);
+                        setUserId(firebaseAuth.currentUser?.uid);
+                    }
+                }
+                setIsAuthReady(true);
+            });
+
+            return () => unsubscribe();
+        } catch (error) {
+            console.error("Failed to initialize Firebase:", error);
+        }
+    }, []);
+
+    // Fetch motorcycles from Firestore
+    useEffect(() => {
+        if (isAuthReady && db && userId) {
+            const motorcyclesCollectionRef = collection(db, `artifacts/${__app_id}/public/data/motorcycles`);
+
+            const unsubscribe = onSnapshot(motorcyclesCollectionRef, (snapshot) => {
+                const fetchedMotorcycles = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                setMotorcycles(fetchedMotorcycles);
+            }, (error) => {
+                console.error("Error fetching motorcycles:", error);
+            });
+
+            return () => unsubscribe();
+        }
+    }, [isAuthReady, db, userId]);
+
+    // Handlers for navigation and actions
+    const handleAddMotorcycle = useCallback(() => {
+        setEditingMotorcycle(null); // Clear any existing edit
+        setCurrentPage('form');
+    }, []);
+
+    const handleEditMotorcycle = useCallback((motorcycle) => {
+        setEditingMotorcycle(motorcycle);
+        setCurrentPage('form');
+    }, []);
+
+    const handleDeleteMotorcycle = useCallback(async (id) => {
+        if (!db) {
+            console.error("Firestore not available.");
+            return;
+        }
+        try {
+            const motorcycleDocRef = doc(db, `artifacts/${__app_id}/public/data/motorcycles`, id);
+            await deleteDoc(motorcycleDocRef);
+            console.log("Motorcycle deleted successfully!");
+        } catch (error) {
+            console.error("Error deleting motorcycle:", error);
+        }
+    }, [db]);
+
+    const handleFormSave = useCallback(() => {
+        setEditingMotorcycle(null);
+        setCurrentPage('list'); // Go back to list after saving
+    }, []);
+
+    const handleCancelEdit = useCallback(() => {
+        setEditingMotorcycle(null);
+        setCurrentPage('list'); // Go back to list if editing is cancelled
+    }, []);
+
+    // Handle login for the main user
+    const handleLogin = (e) => {
+        e.preventDefault();
+        setLoginError('');
+        if (username === 'ליאור' && password === '123') {
+            setIsMainUser(true);
+            // Optionally, you could store a token or flag in localStorage here for persistence
+        } else {
+            setLoginError('שם משתמש או סיסמה שגויים.');
+        }
+    };
+
+    const handleLogout = () => {
+        setIsMainUser(false);
+        setUsername('');
+        setPassword('');
+        setLoginError('');
+    };
+
+    // Loading indicator
+    if (!isAuthReady) {
+        return (
+            <div className="flex items-center justify-center min-h-screen bg-gray-900 text-gray-100">
+                <div className="text-lg font-semibold animate-pulse">טוען נתונים...</div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="min-h-screen bg-gradient-to-br from-gray-950 to-gray-800 text-gray-100 font-inter p-4 sm:p-6 lg:p-8 relative overflow-hidden">
+            {/* Futuristic background elements */}
+            <div className="absolute inset-0 z-0 opacity-10">
+                <div className="w-full h-full bg-no-repeat bg-cover bg-center" style={{ backgroundImage: 'url(https://placehold.co/1920x1080/1a202c/667eea?text=Futuristic+Grid)' }}></div>
+            </div>
+            <div className="absolute inset-0 z-0 bg-gradient-to-br from-purple-900 via-transparent to-cyan-900 opacity-20 animate-bg-pulse"></div>
+
+            {/* Main content */}
+            <div className="relative z-10">
+                {/* Header */}
+                <header className="mb-8 text-center">
+                    <div className="flex items-center justify-center mb-4">
+                        <MotorcycleIcon />
+                        <h1 className="text-4xl sm:text-5xl font-extrabold text-cyan-400 ml-4">
+                            ניהול אופנועים
+                        </h1>
+                    </div>
+                    <p className="text-lg text-gray-300">
+                        העתיד של ניהול צי האופנועים שלך.
+                    </p>
+                </header>
+
+                {/* Login Section */}
+                {!isMainUser && (
+                    <section className="bg-gray-800 rounded-xl shadow-2xl p-6 sm:p-8 mb-10 max-w-md mx-auto border border-purple-700 animate-fade-in-up">
+                        <h2 className="text-2xl sm:text-3xl font-bold text-cyan-400 mb-6 text-center">
+                            התחבר כמשתמש ראשי
+                        </h2>
+                        <form onSubmit={handleLogin} className="space-y-4">
+                            <div>
+                                <label htmlFor="username" className="block text-sm font-medium text-gray-300 mb-1">
+                                    שם משתמש:
+                                </label>
+                                <input
+                                    type="text"
+                                    id="username"
+                                    value={username}
+                                    onChange={(e) => setUsername(e.target.value)}
+                                    className="mt-1 block w-full px-4 py-2 border border-gray-600 rounded-lg shadow-sm focus:ring-cyan-500 focus:border-cyan-500 bg-gray-700 text-gray-100"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-1">
+                                    סיסמה:
+                                </label>
+                                <input
+                                    type="password"
+                                    id="password"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                    className="mt-1 block w-full px-4 py-2 border border-gray-600 rounded-lg shadow-sm focus:ring-cyan-500 focus:border-cyan-500 bg-gray-700 text-gray-100"
+                                    required
+                                />
+                            </div>
+                            {loginError && (
+                                <p className="text-red-400 text-sm text-center">{loginError}</p>
+                            )}
+                            <div className="flex justify-center mt-6">
+                                <button
+                                    type="submit"
+                                    className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ring-offset-gray-800"
+                                >
+                                    התחבר
+                                </button>
+                            </div>
+                        </form>
+                    </section>
+                )}
+
+                {isMainUser && (
+                    <div className="text-center mb-6">
+                        <p className="text-lg text-green-400 font-semibold mb-4">
+                            מחובר כמשתמש ראשי: ליאור
+                        </p>
+                        <button
+                            onClick={handleLogout}
+                            className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-full shadow-lg transform transition duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 ring-offset-gray-800"
+                        >
+                            התנתק
+                        </button>
+                    </div>
+                )}
+
+                {/* Navigation Buttons */}
+                <nav className="mb-10 flex justify-center space-x-4">
+                    <button
+                        onClick={() => setCurrentPage('list')}
+                        className={`py-3 px-8 rounded-full shadow-lg transform transition duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 ${currentPage === 'list' ? 'bg-purple-600 text-white ring-purple-500 ring-offset-gray-800' : 'bg-gray-700 text-gray-300 hover:bg-gray-600 ring-gray-500 ring-offset-gray-800'}`}
+                    >
+                        רשימת אופנועים
+                    </button>
+                    {isMainUser && ( // Only show add button if main user
+                        <button
+                            onClick={handleAddMotorcycle}
+                            className={`py-3 px-8 rounded-full shadow-lg transform transition duration-300 ease-in-out hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 ${currentPage === 'form' && !editingMotorcycle ? 'bg-purple-600 text-white ring-purple-500 ring-offset-gray-800' : 'bg-gray-700 text-gray-300 hover:bg-gray-600 ring-gray-500 ring-offset-gray-800'}`}
+                        >
+                            הוסף אופנוע
+                        </button>
+                    )}
+                </nav>
+
+                {/* Conditional Rendering of Pages */}
+                {currentPage === 'form' && isMainUser ? ( // Only show form if main user is logged in
+                    <MotorcycleForm
+                        db={db}
+                        userId={userId}
+                        currentMotorcycle={editingMotorcycle}
+                        onSave={handleFormSave}
+                        onCancelEdit={handleCancelEdit}
+                    />
+                ) : (
+                    <MotorcycleList
+                        motorcycles={motorcycles}
+                        userId={userId}
+                        onEdit={handleEditMotorcycle}
+                        onDelete={handleDeleteMotorcycle}
+                        onAddMotorcycle={handleAddMotorcycle}
+                        isMainUser={isMainUser} // Pass main user status to list component
+                    />
+                )}
+            </div>
+
+            {/* Tailwind CSS Custom Animations */}
+            <style jsx>{`
+                @keyframes fade-in {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                @keyframes fade-in-up {
+                    from { opacity: 0; transform: translateY(20px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+                @keyframes fade-in-card {
+                    from { opacity: 0; transform: scale(0.9); }
+                    to { opacity: 1; transform: scale(1); }
+                }
+                @keyframes scale-in {
+                    from { transform: scale(0.8); opacity: 0; }
+                    to { transform: scale(1); opacity: 1; }
+                }
+                @keyframes bg-pulse {
+                    0% { opacity: 0.2; }
+                    50% { opacity: 0.3; }
+                    100% { opacity: 0.2; }
+                }
+
+                .animate-fade-in { animation: fade-in 0.5s ease-out forwards; }
+                .animate-fade-in-up { animation: fade-in-up 0.6s ease-out forwards; }
+                .animate-fade-in-card { animation: fade-in-card 0.5s ease-out forwards; }
+                .animate-scale-in { animation: scale-in 0.3s ease-out forwards; }
+                .animate-bg-pulse { animation: bg-pulse 8s infinite alternate; }
+            `}</style>
+        </div>
+    );
+}
+
+export default App;
